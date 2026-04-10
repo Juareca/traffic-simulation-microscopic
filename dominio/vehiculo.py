@@ -36,6 +36,7 @@ class Vehiculo:
         self.id = id
         self.posicion = posicion  # metros
         self.posicion_anterior = posicion
+        self.carril = None
         self.velocidad = velocidad  # m/s
         self.aceleracion = 0  # m/s^2 (calculada por IDM)
 
