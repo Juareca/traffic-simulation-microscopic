@@ -23,10 +23,10 @@ class SimulationWidget(QWidget):
         self.color_linea = QColor(255, 255, 255)
 
         # Parámetros visuales
-        self.ESCALA = 3.0
+        self.ESCALA = 5.0
         self.ANCHO_CARRIL = 12
-        self.LARGO_VEHICULO = 18
-        self.ALTO_VEHICULO = 10
+        self.LARGO_VEHICULO = 30
+        self.ALTO_VEHICULO = 15
         self.RADIO_SEMAFORO = 8
 
     # ------------------------------------------------------------------
@@ -75,23 +75,31 @@ class SimulationWidget(QWidget):
 
     def _pos_vehiculo(self, carretera, carril, veh):
         pos = veh.posicion * self.ESCALA
-        lane_offset = (carril.indice - 0.5) * self.ANCHO_CARRIL
+        num = len(carretera.carriles)
 
-        if carretera.direccion == "O-E":
-            x = carretera.x + pos
-            y = carretera.y + carretera.alto / 2 + lane_offset
+        # HORIZONTALES (O-E, E-O)
+        if carretera.direccion in ("O-E", "E-O"):
+            # centro del carril usando el ALTO real de la carretera
+            lane_center_y = carretera.y + ( (carril.indice + 0.5) * (carretera.alto / num) )
 
-        elif carretera.direccion == "E-O":
-            x = carretera.x + carretera.ancho - pos
-            y = carretera.y + carretera.alto / 2 + lane_offset
+            if carretera.direccion == "O-E":
+                x = carretera.x + pos
+            else:
+                x = carretera.x + carretera.ancho - pos
 
-        elif carretera.direccion == "S-N":
-            x = carretera.x + carretera.ancho / 2 + lane_offset
-            y = carretera.y + carretera.alto - pos
+            y = lane_center_y
 
-        else:  # N-S
-            x = carretera.x + carretera.ancho / 2 + lane_offset
-            y = carretera.y + pos
+        # VERTICALES (N-S, S-N)
+        else:
+            # centro del carril usando el ANCHO real de la carretera
+            lane_center_x = carretera.x + ( (carril.indice + 0.5) * (carretera.ancho / num) )
+
+            if carretera.direccion == "S-N":
+                y = carretera.y + carretera.alto - pos
+            else:
+                y = carretera.y + pos
+
+            x = lane_center_x
 
         return int(x), int(y)
 
@@ -151,14 +159,24 @@ class SimulationWidget(QWidget):
             )
 
         # Vehículos
-        painter.setBrush(self.color_vehiculo)
         for carretera in self.simulacion.carreteras:
             for carril in carretera.carriles:
                 for v in carril.vehiculos:
                     x, y = self._pos_vehiculo(carretera, carril, v)
+
+                    # Forma según dirección
+                    if carretera.direccion in ("O-E", "E-O"):
+                        w = self.LARGO_VEHICULO
+                        h = self.ALTO_VEHICULO
+                    else:  # S-N, N-S
+                        w = self.ALTO_VEHICULO
+                        h = self.LARGO_VEHICULO
+
+                    painter.setBrush(self.color_vehiculo)
                     painter.drawRect(
-                        x - self.LARGO_VEHICULO // 2,
-                        y - self.ALTO_VEHICULO // 2,
-                        self.LARGO_VEHICULO,
-                        self.ALTO_VEHICULO
+                        x - w // 2,
+                        y - h // 2,
+                        w,
+                        h
                     )
+

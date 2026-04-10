@@ -56,7 +56,7 @@ class IDM:
         self.T = 1.5                  # tiempo de reacción (s)
         self.a_max = 2                # aceleración máxima (m/s^2)
         self.b = 5                    # desaceleración cómoda (m/s^2)
-        self.s0 = 2                   # distancia mínima (m)
+        self.s0 = 6                   # distancia mínima (m)
         self.delta = 4                # exponente
         
         # 🚀 CACHÉ para evitar recálculos costosos

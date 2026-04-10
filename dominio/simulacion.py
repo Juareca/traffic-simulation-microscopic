@@ -34,7 +34,7 @@ class Simulacion:
         self.tiempo = 0.0
 
         # Intervalo entre llegadas de vehículos
-        self.intervalo_llegada = random.uniform(2.0, 5.0)
+        self.intervalo_llegada = 1.0
         self.tiempo_ultimo_vehiculo = 0.0
         self.contador_ids = 1
 
@@ -70,7 +70,7 @@ class Simulacion:
             # NORTE → SUR (vertical derecha)            
             Carretera(
                 x=centro_x - grosor,
-                y=20,
+                y=0,
                 ancho=grosor,
                 alto=alto,
                 direccion="N-S",
@@ -89,7 +89,7 @@ class Simulacion:
 
             # ESTE → OESTE (horizontal arriba)
             Carretera(
-                x=20,
+                x=0,
                 y=centro_y - grosor,
                 ancho=ancho,
                 alto=grosor,
@@ -108,7 +108,6 @@ class Simulacion:
             ),
         ]
 
-
     # ------------------------------------------------------------------
     # Generación de vehículos
     # ------------------------------------------------------------------
@@ -118,8 +117,8 @@ class Simulacion:
 
         nuevo = Vehiculo(
             id=self.contador_ids,
-            posicion=-5.0,
-            velocidad=2.0,
+            posicion= -5.0,
+            velocidad= random.uniform(1.0, 3.0)
         )
         nuevo.carril = carril
 
