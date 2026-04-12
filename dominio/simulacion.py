@@ -14,7 +14,7 @@ from dominio.semaforo import Semaforo
 
 
 class Obstaculo:
-    """Obstáculo fijo usado por el IDM (p.ej. semáforo en rojo)."""
+    """Obstáculo fijo usado por el IDM (p.ej. semáforo en rojo o línea de cebra)."""
     def __init__(self):
         self.velocidad = 0.0
         self.largo = 0.0
@@ -24,6 +24,8 @@ class Simulacion:
     """Controlador principal de la simulación microscópica."""
 
     RANGO_MAXIMO_POSICION = 150.0  # metros
+    ESCALA = 5.0  # pixeles por metro (debe coincidir con SimulationWidget.ESCALA)
+    DISTANCIA_FRENADO_CEBRA = 10.0  # metros antes de la línea blanca
 
     def __init__(self, ancho, alto, grosor, debug=False, seed=None):
         if seed is not None:
@@ -67,7 +69,7 @@ class Simulacion:
         centro_y = alto // 2
 
         return [
-            # NORTE → SUR (vertical derecha)            
+            # NORTE → SUR (vertical derecha)
             Carretera(
                 x=centro_x - grosor,
                 y=0,
@@ -117,8 +119,8 @@ class Simulacion:
 
         nuevo = Vehiculo(
             id=self.contador_ids,
-            posicion= -5.0,
-            velocidad= random.uniform(1.0, 3.0)
+            posicion=-5.0,
+            velocidad= Vehiculo.v0
         )
         nuevo.carril = carril
 

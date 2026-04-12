@@ -6,8 +6,17 @@ class Carretera:
         self.alto = alto
         self.direccion = direccion
 
-        # Crear carriles
+        # Posición del cruce en PIXELES
+        self.pos_cruce = self._calcular_pos_cruce()
+
         self.carriles = [Carril(i, self.direccion) for i in range(num_carriles)]
+
+    def _calcular_pos_cruce(self):
+        if self.direccion in ("N-S", "S-N"):
+            return self.alto / 2
+        else:
+            return self.ancho / 2
+
 
 class Carril:
     def __init__(self, indice, direccion):
