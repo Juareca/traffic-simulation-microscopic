@@ -24,9 +24,9 @@ class SimulationWidget(QWidget):
 
         # Parámetros visuales
         self.ESCALA = 5.0
-        self.ANCHO_CARRIL = 12
-        self.LARGO_VEHICULO = 30
-        self.ALTO_VEHICULO = 15
+        self.ANCHO_CARRIL = 20
+        self.LARGO_VEHICULO = 20
+        self.ALTO_VEHICULO = 10
         self.RADIO_SEMAFORO = 8
 
     # ------------------------------------------------------------------
@@ -72,7 +72,6 @@ class SimulationWidget(QWidget):
 
         return int(x), int(y)
 
-
     def _pos_vehiculo(self, carretera, carril, veh):
         pos = veh.posicion * self.ESCALA
         num = len(carretera.carriles)
@@ -102,6 +101,49 @@ class SimulationWidget(QWidget):
             x = lane_center_x
 
         return int(x), int(y)
+
+    def _dibujar_cebra(self, painter):
+        painter.setBrush(self.color_linea)
+        painter.setPen(self.color_linea)
+
+        grosor_linea = 4
+        offset = 70  # distancia desde el centro
+        ancho_carretera = 120  # ajusta a gusto
+
+        centro_x = self.width() // 2
+        centro_y = self.height() // 2
+
+        # Vertical superior
+        painter.drawRect(
+            int(centro_x - ancho_carretera // 2),
+            int(centro_y - offset) + 30,
+            int(ancho_carretera),
+            grosor_linea
+        )
+
+        # Vertical inferior
+        painter.drawRect(
+            int(centro_x - ancho_carretera // 2),
+            int(centro_y + offset) + 36,
+            int(ancho_carretera),
+            grosor_linea
+        )
+
+        # Horizontal izquierda
+        painter.drawRect(
+            int(centro_x - offset) - 5,
+            int(centro_y - ancho_carretera // 2) + 33,
+            grosor_linea,
+            int(ancho_carretera)
+        )
+
+        # Horizontal derecha
+        painter.drawRect(
+            int(centro_x + offset) + 5,
+            int(centro_y - ancho_carretera // 2) + 33,
+            grosor_linea,
+            int(ancho_carretera)
+        )
 
     def _dibujar_lineas_carril(self, painter, carretera):
         painter.setPen(self.color_linea)
@@ -144,7 +186,10 @@ class SimulationWidget(QWidget):
                 int(carretera.ancho),
                 int(carretera.alto)
             )
+            
             self._dibujar_lineas_carril(painter, carretera)
+        # Cebra
+        self._dibujar_cebra(painter)
 
         # Semáforos (4)
         for carretera in self.simulacion.carreteras:
