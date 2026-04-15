@@ -1,12 +1,16 @@
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QPainter, QColor
-
+from dominio.config import ESCALA
 
 class SimulationWidget(QWidget):
     def __init__(self, simulacion):
         super().__init__()
-        self.simulacion = simulacion
+        
+        # Crear simulación correctamente
+        self.simulacion = simulacion 
+
+        self.setFocusPolicy(Qt.StrongFocus)
 
         # Timer a 60 FPS
         self.timer = QTimer(self)
@@ -23,7 +27,7 @@ class SimulationWidget(QWidget):
         self.color_linea = QColor(255, 255, 255)
 
         # Parámetros visuales
-        self.ESCALA = 5.0
+        self.ESCALA = ESCALA
         self.ANCHO_CARRIL = 20
         self.LARGO_VEHICULO = 20
         self.ALTO_VEHICULO = 10
@@ -35,6 +39,10 @@ class SimulationWidget(QWidget):
     def actualizar(self):
         self.simulacion.paso(0.016)
         self.update()
+    
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            QApplication.quit()
 
     # ------------------------------------------------------------------
     # Helpers de dibujo
@@ -53,7 +61,7 @@ class SimulationWidget(QWidget):
         # S-N → semáforo abajo del cruce (vehículos suben)
         if carretera.direccion == "S-N":
             x = centro_x
-            y = centro_y + 160
+            y = centro_y + 120
 
         # N-S → semáforo arriba del cruce (vehículos bajan)
         elif carretera.direccion == "N-S":
@@ -63,12 +71,12 @@ class SimulationWidget(QWidget):
         # O-E → semáforo a la derecha del cruce (vehículos van →)
         elif carretera.direccion == "O-E":
             x = centro_x - 120
-            y = centro_y + 35
+            y = centro_y
 
         # E-O → semáforo a la izquierda del cruce (vehículos van ←)
         else:  # "E-O"
             x = centro_x + 120
-            y = centro_y + 35
+            y = centro_y 
 
         return int(x), int(y)
 
@@ -116,7 +124,7 @@ class SimulationWidget(QWidget):
         # Vertical superior
         painter.drawRect(
             int(centro_x - ancho_carretera // 2),
-            int(centro_y - offset) + 30,
+            int(centro_y - offset) ,
             int(ancho_carretera),
             grosor_linea
         )
@@ -124,7 +132,7 @@ class SimulationWidget(QWidget):
         # Vertical inferior
         painter.drawRect(
             int(centro_x - ancho_carretera // 2),
-            int(centro_y + offset) + 36,
+            int(centro_y + offset),
             int(ancho_carretera),
             grosor_linea
         )
@@ -132,7 +140,7 @@ class SimulationWidget(QWidget):
         # Horizontal izquierda
         painter.drawRect(
             int(centro_x - offset) - 5,
-            int(centro_y - ancho_carretera // 2) + 33,
+            int(centro_y - ancho_carretera // 2),
             grosor_linea,
             int(ancho_carretera)
         )
@@ -140,7 +148,7 @@ class SimulationWidget(QWidget):
         # Horizontal derecha
         painter.drawRect(
             int(centro_x + offset) + 5,
-            int(centro_y - ancho_carretera // 2) + 33,
+            int(centro_y - ancho_carretera // 2),
             grosor_linea,
             int(ancho_carretera)
         )
@@ -165,7 +173,6 @@ class SimulationWidget(QWidget):
                 int(x),
                 int(carretera.y + carretera.alto)
             )
-
         painter.setPen(Qt.SolidLine)
 
     # ------------------------------------------------------------------

@@ -2,7 +2,11 @@ from PySide6.QtWidgets import QMainWindow
 from PySide6.QtGui import QGuiApplication
 
 from presentacion.simulation_widget import SimulationWidget
-from dominio.simulacion import Simulacion
+from control.simulacion import Simulacion
+
+print(">>> Simulacion importada desde:", Simulacion.__module__)
+print(">>> Archivo real:", Simulacion.__dict__.get('__file__'))
+print(">>> Métodos disponibles:", [m for m in dir(Simulacion) if not m.startswith('_')])
 
 
 class MainWindow(QMainWindow):
@@ -16,14 +20,15 @@ class MainWindow(QMainWindow):
 
         ancho = screen_size.width()
         alto = screen_size.height()
-        grosor = 70  # puedes ajustarlo luego
+        grosor = 70  # grosor de carretera (ajústalo si quieres)
 
         # 🚗 Crear simulación con tamaño dinámico
-        self.simulacion = Simulacion(ancho, alto, grosor, debug=debug, seed=seed)
+        # Aquí creamos la instancia REAL de Simulacion
+        simulacion = Simulacion(ancho, alto, grosor, debug=debug, seed=seed)
 
-        # 🎮 Widget principal
-        self.widget = SimulationWidget(self.simulacion)
+        # 🎮 Crear widget de simulación pasándole la instancia
+        self.widget = SimulationWidget(simulacion)
         self.setCentralWidget(self.widget)
 
         # 🖥️ Pantalla completa
-        self.showMaximized()
+        self.showFullScreen()

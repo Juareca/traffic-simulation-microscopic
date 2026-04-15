@@ -11,7 +11,8 @@ from dominio.vehiculo import Vehiculo
 from dominio.idm import IDM
 from dominio.metricas import Metricas
 from dominio.semaforo import Semaforo
-
+from control.controlador_semaforos import ControladorSemaforos
+from dominio.config import ESCALA
 
 class Obstaculo:
     """Obstáculo fijo usado por el IDM (p.ej. semáforo en rojo o línea de cebra)."""
@@ -23,11 +24,14 @@ class Obstaculo:
 class Simulacion:
     """Controlador principal de la simulación microscópica."""
 
-    RANGO_MAXIMO_POSICION = 150.0  # metros
-    ESCALA = 5.0  # pixeles por metro (debe coincidir con SimulationWidget.ESCALA)
-    DISTANCIA_FRENADO_CEBRA = 10.0  # metros antes de la línea blanca
+    ESCALA = ESCALA  # pixeles por metro CONFIG.PY
+    DISTANCIA_FRENADO_CEBRA = 3.0  # metros antes de la línea blanca
 
     def __init__(self, ancho, alto, grosor, debug=False, seed=None):
+        # Guardar tamaño de pantalla
+        self.ancho_pantalla = ancho
+        self.alto_pantalla = alto
+
         if seed is not None:
             random.seed(seed)
 
@@ -50,11 +54,27 @@ class Simulacion:
 
         # 4 semáforos: uno por dirección de carretera
         self.semaforos = {
-            "S-N": Semaforo(40, 20, 2, 20),
-            "N-S": Semaforo(40, 20, 2, 20),
-            "O-E": Semaforo(40, 20, 2, 20),
-            "E-O": Semaforo(40, 20, 2, 20),
+            "S-N": Semaforo(40),
+            "N-S": Semaforo(40),
+            "O-E": Semaforo(40),
+            "E-O": Semaforo(40),
         }
+
+        # Controlador de fases semafóricas
+        self.controlador_semaforos = ControladorSemaforos(
+            semaforos={
+                "NS": self.semaforos["N-S"],
+                "SN": self.semaforos["S-N"],
+                "EO": self.semaforos["E-O"],
+                "OE": self.semaforos["O-E"],
+            },
+            tiempos={
+                "NS": {"verde": 20, "amarillo": 3},
+                "SN": {"verde": 20, "amarillo": 3},
+                "EO": {"verde": 20, "amarillo": 3},
+                "OE": {"verde": 20, "amarillo": 3},
+            }
+        )
 
         # Lista global de vehículos (para métricas)
         self.vehiculos = []
@@ -69,45 +89,10 @@ class Simulacion:
         centro_y = alto // 2
 
         return [
-            # NORTE → SUR (vertical derecha)
-            Carretera(
-                x=centro_x - grosor,
-                y=0,
-                ancho=grosor,
-                alto=alto,
-                direccion="N-S",
-                num_carriles=2
-            ),
-
-            # SUR → NORTE (vertical izquierda)
-            Carretera(
-                x=centro_x,
-                y=0,
-                ancho=grosor,
-                alto=alto,
-                direccion="S-N",
-                num_carriles=2
-            ),
-
-            # ESTE → OESTE (horizontal arriba)
-            Carretera(
-                x=0,
-                y=centro_y - grosor,
-                ancho=ancho,
-                alto=grosor,
-                direccion="E-O",
-                num_carriles=2
-            ),
-
-            # OESTE → ESTE (horizontal abajo)
-            Carretera(
-                x=0,
-                y=centro_y,
-                ancho=ancho,
-                alto=grosor,
-                direccion="O-E",
-                num_carriles=2
-            ),
+            Carretera(centro_x - grosor, 0, grosor, alto, "N-S", 2),
+            Carretera(centro_x, 0, grosor, alto, "S-N", 2),
+            Carretera(0, centro_y - grosor, ancho, grosor, "E-O", 2),
+            Carretera(0, centro_y, ancho, grosor, "O-E", 2),
         ]
 
     # ------------------------------------------------------------------
@@ -120,7 +105,7 @@ class Simulacion:
         nuevo = Vehiculo(
             id=self.contador_ids,
             posicion=-5.0,
-            velocidad= Vehiculo.v0
+            velocidad=Vehiculo.v0
         )
         nuevo.carril = carril
 
@@ -129,18 +114,46 @@ class Simulacion:
         self.contador_ids += 1
 
     # ------------------------------------------------------------------
-    # Limpieza de vehículos fuera de rango
+    # Limpieza de vehículos fuera de pantalla
     # ------------------------------------------------------------------
     def _limpiar_vehiculos(self):
         vehiculos_dentro = []
         vehiculos_salientes = []
 
         for v in self.vehiculos:
-            if v.posicion > self.RANGO_MAXIMO_POSICION:
+            carril = v.carril
+            carretera = carril.carretera
+            direccion = carretera.direccion
+
+            pos_px = v.posicion * self.ESCALA
+
+            # POSICIÓN EN PANTALLA
+            if direccion == "N-S":
+                x_px = carretera.x + carretera.ancho // 2
+                y_px = carretera.y + pos_px
+
+            elif direccion == "S-N":
+                x_px = carretera.x + carretera.ancho // 2
+                y_px = carretera.y + carretera.alto - pos_px
+
+            elif direccion == "E-O":
+                x_px = carretera.x + pos_px
+                y_px = carretera.y + carretera.alto // 2
+
+            else:  # "O-E"
+                x_px = carretera.x + carretera.ancho - pos_px
+                y_px = carretera.y + carretera.alto // 2
+
+            # ELIMINACIÓN SEGÚN PANTALLA
+            if (
+                x_px < -50 or x_px > self.ancho_pantalla + 50 or
+                y_px < -50 or y_px > self.alto_pantalla + 50
+            ):
                 vehiculos_salientes.append(v)
             else:
                 vehiculos_dentro.append(v)
 
+        # Actualizar listas
         self.vehiculos = vehiculos_dentro
 
         if vehiculos_salientes:
@@ -178,26 +191,24 @@ class Simulacion:
 
         self.tiempo += dt
 
-        # Actualizar todos los semáforos
-        for sem in self.semaforos.values():
-            sem.actualizar(dt)
+        # Actualizar semáforos
+        self.controlador_semaforos.actualizar(dt)
 
-        # Generar vehículos según intervalo
+        # Generar vehículos
         if self.tiempo - self.tiempo_ultimo_vehiculo >= self.intervalo_llegada:
             self._generar_vehiculo()
             self.tiempo_ultimo_vehiculo = self.tiempo
 
-        # Actualizar dinámica por carretera y carril
+        # Dinámica por carretera
         for carretera in self.carreteras:
             semaforo = self.semaforos[carretera.direccion]
-            semaforo_activo = semaforo.estado in ("rojo", "amarillo")
 
             for carril in carretera.carriles:
                 vehs = carril.vehiculos
                 vehs.sort(key=lambda v: v.posicion)
 
                 for i, v in enumerate(vehs):
-                    # Líder o seguidor
+                    # Líder
                     if i == len(vehs) - 1:
                         veh_adelante = None
                         distancia = float("inf")
@@ -209,12 +220,21 @@ class Simulacion:
                         )
                         veh_adelante = v_adelante
 
-                    # Semáforo como obstáculo (para esta carretera)
-                    if semaforo_activo:
-                        d = semaforo.posicion - v.posicion - v.largo
-                        if 0 < d < distancia:
-                            distancia = d
-                            veh_adelante = self.obstaculo_fijo
+                    # Frenado por cebra
+                    pos_cruce_pixeles = carretera.pos_cruce
+                    pos_cruce_metros = pos_cruce_pixeles / self.ESCALA
+
+                    offset_pixeles = 70
+                    offset_metros = offset_pixeles / self.ESCALA
+
+                    pos_linea_blanca = pos_cruce_metros - offset_metros
+                    pos_parada = pos_linea_blanca - self.DISTANCIA_FRENADO_CEBRA
+
+                    d_cebra = pos_parada - v.posicion - v.largo
+
+                    if semaforo.estado == "rojo" and 0 < d_cebra < distancia:
+                        distancia = d_cebra
+                        veh_adelante = self.obstaculo_fijo
 
                     # Aceleración IDM
                     v.aceleracion = self.idm.calcular_aceleracion(
@@ -240,5 +260,5 @@ class Simulacion:
             f"Vel={vel_prom:5.2f} m/s"
         )
 
-        # Limpiar vehículos fuera de rango
+        # Limpiar vehículos fuera de pantalla
         self._limpiar_vehiculos()
