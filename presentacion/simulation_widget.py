@@ -68,12 +68,12 @@ class SimulationWidget(QWidget):
             x = centro_x
             y = centro_y - 120
 
-        # O-E → semáforo a la derecha del cruce (vehículos van →)
+        # O-E → semáforo a la izquierda del cruce (vehículos van →)
         elif carretera.direccion == "O-E":
             x = centro_x - 120
             y = centro_y
 
-        # E-O → semáforo a la izquierda del cruce (vehículos van ←)
+        # E-O <- semáforo a la derecha del cruce (vehículos van ←)
         else:  # "E-O"
             x = centro_x + 120
             y = centro_y 

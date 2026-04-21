@@ -5,26 +5,11 @@ class ControladorSemaforos:
     """
 
     def __init__(self, semaforos, tiempos):
-        """
-        semaforos = {
-            "NS": Semaforo,
-            "SN": Semaforo,
-            "EO": Semaforo,
-            "OE": Semaforo
-        }
-
-        tiempos = {
-            "NS": {"verde": 20, "amarillo": 3},
-            "SN": {"verde": 20, "amarillo": 3},
-            "EO": {"verde": 20, "amarillo": 3},
-            "OE": {"verde": 20, "amarillo": 3},
-        }
-        """
 
         self.semaforos = semaforos
         self.tiempos = tiempos
 
-        self.fases = ["NS", "SN", "EO", "OE"]
+        self.fases = ["N-S", "S-N", "E-O", "O-E"]
         self.fase_actual = 0
         self.tiempo_fase = 0.0
 

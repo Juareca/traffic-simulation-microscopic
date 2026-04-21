@@ -20,15 +20,13 @@ class Obstaculo:
         self.velocidad = 0.0
         self.largo = 0.0
 
-
 class Simulacion:
-    """Controlador principal de la simulación microscópica."""
 
-    ESCALA = ESCALA  # pixeles por metro CONFIG.PY
-    DISTANCIA_FRENADO_CEBRA = 3.0  # metros antes de la línea blanca
+    ESCALA = ESCALA
+    DISTANCIA_FRENADO_CEBRA = 3.0
 
     def __init__(self, ancho, alto, grosor, debug=False, seed=None):
-        # Guardar tamaño de pantalla
+
         self.ancho_pantalla = ancho
         self.alto_pantalla = alto
 
@@ -39,20 +37,16 @@ class Simulacion:
         self.seed = seed
         self.tiempo = 0.0
 
-        # Intervalo entre llegadas de vehículos
-        self.intervalo_llegada = 1.0
-        self.tiempo_ultimo_vehiculo = 0.0
         self.contador_ids = 1
 
-        # Dominio
         self.idm = IDM()
-        self.metricas = Metricas()
+
+        self.carreteras = self._crear_carreteras(ancho, alto, grosor)
+        self.metricas = Metricas(self.carreteras)
+
         self.obstaculo_fijo = Obstaculo()
 
-        # Carreteras (4) con 2 carriles cada una
-        self.carreteras = self._crear_carreteras(ancho, alto, grosor)
-
-        # 4 semáforos: uno por dirección de carretera
+        # Semáforos
         self.semaforos = {
             "S-N": Semaforo(40),
             "N-S": Semaforo(40),
@@ -60,205 +54,273 @@ class Simulacion:
             "E-O": Semaforo(40),
         }
 
-        # Controlador de fases semafóricas
+        # 🔥 Tasa de tráfico (veh/s por dirección)
+        self.trafico_por_direccion = {
+            "N-S": 20,
+            "S-N": 20,
+            "E-O": 20,
+            "O-E": 20
+        }
+
+        self.acumulador_generacion = {
+            d: 0.0 for d in self.trafico_por_direccion
+        }
+
         self.controlador_semaforos = ControladorSemaforos(
             semaforos={
-                "NS": self.semaforos["N-S"],
-                "SN": self.semaforos["S-N"],
-                "EO": self.semaforos["E-O"],
-                "OE": self.semaforos["O-E"],
+                "N-S": self.semaforos["N-S"],
+                "S-N": self.semaforos["S-N"],
+                "E-O": self.semaforos["E-O"],
+                "O-E": self.semaforos["O-E"],
             },
             tiempos={
-                "NS": {"verde": 20, "amarillo": 3},
-                "SN": {"verde": 20, "amarillo": 3},
-                "EO": {"verde": 20, "amarillo": 3},
-                "OE": {"verde": 20, "amarillo": 3},
+                "N-S": {"verde": 10, "amarillo": 2},
+                "S-N": {"verde": 10, "amarillo": 2},
+                "E-O": {"verde": 10, "amarillo": 2},
+                "O-E": {"verde": 10, "amarillo": 2},
             }
         )
 
-        # Lista global de vehículos (para métricas)
         self.vehiculos = []
-
         self._inicio_impreso = False
 
-    # ------------------------------------------------------------------
-    # Construcción de carreteras
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------
     def _crear_carreteras(self, ancho, alto, grosor):
-        centro_x = ancho // 2
-        centro_y = alto // 2
+        cx = ancho // 2
+        cy = alto // 2
 
         return [
-            Carretera(centro_x - grosor, 0, grosor, alto, "N-S", 2),
-            Carretera(centro_x, 0, grosor, alto, "S-N", 2),
-            Carretera(0, centro_y - grosor, ancho, grosor, "E-O", 2),
-            Carretera(0, centro_y, ancho, grosor, "O-E", 2),
+            Carretera(cx - grosor, 0, grosor, alto, "N-S", 2),
+            Carretera(cx, 0, grosor, alto, "S-N", 2),
+            Carretera(0, cy - grosor, ancho, grosor, "E-O", 2),
+            Carretera(0, cy, ancho, grosor, "O-E", 2),
         ]
 
-    # ------------------------------------------------------------------
-    # Generación de vehículos
-    # ------------------------------------------------------------------
-    def _generar_vehiculo(self):
-        carretera = random.choice(self.carreteras)
-        carril = random.choice(carretera.carriles)
+    # -------------------------------------------------------------
+    def _crear_vehiculo(self, velocidad, carril):
+
+        v0 = random.uniform(4.0, 8.0)
 
         nuevo = Vehiculo(
             id=self.contador_ids,
-            posicion=-5.0,
-            velocidad=Vehiculo.v0
+            posicion=0.0,
+            velocidad=velocidad
         )
+
+        nuevo.v0 = v0
+        nuevo.T = random.uniform(1.2, 1.8)
+        nuevo.a_max = random.uniform(0.8, 1.5)
+        nuevo.b = random.uniform(2.0, 3.5)
+
         nuevo.carril = carril
 
         carril.vehiculos.append(nuevo)
         self.vehiculos.append(nuevo)
         self.contador_ids += 1
 
-    # ------------------------------------------------------------------
-    # Limpieza de vehículos fuera de pantalla
-    # ------------------------------------------------------------------
+        return True
+
+    # -------------------------------------------------------------
+    def _generar_vehiculo_en_carretera(self, carretera):
+        carriles = carretera.carriles[:]
+        random.shuffle(carriles)
+
+        for carril in carriles:
+
+            if not carril.vehiculos:
+                velocidad = random.uniform(0.5, 2.0)
+                return self._crear_vehiculo(velocidad, carril)
+
+            primer = min(carril.vehiculos, key=lambda v: v.posicion)
+
+            velocidad = min(primer.velocidad, random.uniform(4.0, 8.0))
+            velocidad = max(2.0, velocidad)
+
+            T_spawn = 1.5
+            gap = self.idm.s0 + velocidad * T_spawn
+
+            if primer.posicion <= gap:
+                continue
+
+            return self._crear_vehiculo(velocidad, carril)
+
+        return False
+
+    # -------------------------------------------------------------
+    def _evaluar_cambio_de_carril(self, vehiculo):
+        pass
+
+    # -------------------------------------------------------------
     def _limpiar_vehiculos(self):
-        vehiculos_dentro = []
-        vehiculos_salientes = []
+
+        dentro = []
+        fuera = []
 
         for v in self.vehiculos:
             carril = v.carril
             carretera = carril.carretera
-            direccion = carretera.direccion
+            d = carretera.direccion
 
             pos_px = v.posicion * self.ESCALA
 
-            # POSICIÓN EN PANTALLA
-            if direccion == "N-S":
-                x_px = carretera.x + carretera.ancho // 2
-                y_px = carretera.y + pos_px
-
-            elif direccion == "S-N":
-                x_px = carretera.x + carretera.ancho // 2
-                y_px = carretera.y + carretera.alto - pos_px
-
-            elif direccion == "E-O":
-                x_px = carretera.x + pos_px
-                y_px = carretera.y + carretera.alto // 2
-
-            else:  # "O-E"
-                x_px = carretera.x + carretera.ancho - pos_px
-                y_px = carretera.y + carretera.alto // 2
-
-            # ELIMINACIÓN SEGÚN PANTALLA
-            if (
-                x_px < -50 or x_px > self.ancho_pantalla + 50 or
-                y_px < -50 or y_px > self.alto_pantalla + 50
-            ):
-                vehiculos_salientes.append(v)
+            if d == "N-S":
+                x = carretera.x + carretera.ancho // 2
+                y = carretera.y + pos_px
+            elif d == "S-N":
+                x = carretera.x + carretera.ancho // 2
+                y = carretera.y + carretera.alto - pos_px
+            elif d == "E-O":
+                x = carretera.x + pos_px
+                y = carretera.y + carretera.alto // 2
             else:
-                vehiculos_dentro.append(v)
+                x = carretera.x + carretera.ancho - pos_px
+                y = carretera.y + carretera.alto // 2
 
-        # Actualizar listas
-        self.vehiculos = vehiculos_dentro
+            if x < -50 or x > self.ancho_pantalla + 50 or y < -50 or y > self.alto_pantalla + 50:
+                fuera.append(v)
+            else:
+                dentro.append(v)
 
-        if vehiculos_salientes:
-            self.metricas.guardar_vehiculos_salientes(vehiculos_salientes)
-            ids_salientes = {v.id for v in vehiculos_salientes}
+        self.vehiculos = dentro
 
+        if fuera:
+            ids = {v.id for v in fuera}
             for carretera in self.carreteras:
                 for carril in carretera.carriles:
-                    carril.vehiculos = [
-                        v for v in carril.vehiculos if v.id not in ids_salientes
-                    ]
+                    carril.vehiculos = [v for v in carril.vehiculos if v.id not in ids]
 
-    # ------------------------------------------------------------------
-    # Debug
-    # ------------------------------------------------------------------
-    def _imprimir_info_inicio(self):
-        if self._inicio_impreso:
-            return
-        self._inicio_impreso = True
+    # -------------------------------------------------------------
+    def obtener_metricas_por_via(self):
+        resultados = {}
 
-        print("\n" + "=" * 60)
-        print("🚗 TrafficSimulator IDM - Simulación Iniciada")
-        print("=" * 60)
-        print(f"Modo debug: {'ACTIVO' if self.debug else 'INACTIVO'}")
-        print(f"Semilla: {self.seed}")
-        print(f"IDM v₀={self.idm.v0} m/s | T={self.idm.T}s | a_max={self.idm.a_max} m/s²")
-        print("=" * 60 + "\n")
+        for carretera in self.carreteras:
+            direccion = carretera.direccion
+            carriles = carretera.carriles
 
-    # ------------------------------------------------------------------
-    # Paso de simulación
-    # ------------------------------------------------------------------
+            cola_total = 0
+            espera_total = 0
+            flujo_total = 0
+            num_carriles = len(carriles)
+
+            for carril in carriles:
+                hist_cola = self.metricas.obtener_historial_cola(carretera, carril)
+                cola_actual = hist_cola[-1] if hist_cola else 0
+                cola_total += cola_actual
+
+                cid = f"{carretera.direccion}_{carril.indice}"
+                espera_actual = self.metricas.datos_carriles[cid]["espera_congelada"]
+                espera_total += espera_actual
+
+                flujo = self.metricas.obtener_conteo_flujo(carretera, carril)
+                flujo_total += flujo
+
+            resultados[direccion] = {
+                "cola": cola_total,
+                "espera": espera_total / num_carriles,
+                "flujo": flujo_total
+            }
+
+        return resultados
+
+    # -------------------------------------------------------------
     def paso(self, dt):
-        if not self._inicio_impreso:
-            self._imprimir_info_inicio()
 
         self.tiempo += dt
-
-        # Actualizar semáforos
         self.controlador_semaforos.actualizar(dt)
 
-        # Generar vehículos
-        if self.tiempo - self.tiempo_ultimo_vehiculo >= self.intervalo_llegada:
-            self._generar_vehiculo()
-            self.tiempo_ultimo_vehiculo = self.tiempo
-
-        # Dinámica por carretera
+        # ---------------------------------------------------------
+        # 🔥 GENERACIÓN DE VEHÍCULOS (veh/h → veh/s)
+        # ---------------------------------------------------------
         for carretera in self.carreteras:
+            d = carretera.direccion
+            tasa = self.trafico_por_direccion[d] / 60.0
+
+            self.acumulador_generacion[d] += tasa * dt
+
+            while self.acumulador_generacion[d] >= 1.0:
+
+                self.acumulador_generacion[d] = min(
+                    self.acumulador_generacion[d], 3.0
+                )
+
+                if self._generar_vehiculo_en_carretera(carretera):
+                    self.acumulador_generacion[d] -= 1.0
+                else:
+                    break
+
+        # ---------------------------------------------------------
+        # 🔥 DINÁMICA + REGISTRO DE MÉTRICAS
+        # ---------------------------------------------------------
+        for carretera in self.carreteras:
+
             semaforo = self.semaforos[carretera.direccion]
 
+            pos_cruce = carretera.pos_cruce / self.ESCALA
+            pos_parada = pos_cruce - (70 / self.ESCALA) - self.DISTANCIA_FRENADO_CEBRA
+
             for carril in carretera.carriles:
+
                 vehs = carril.vehiculos
                 vehs.sort(key=lambda v: v.posicion)
 
+                # Calcular aceleraciones
                 for i, v in enumerate(vehs):
-                    # Líder
+
+                    if v.velocidad <= 0.1 and v.tiempo_parado < v.tiempo_reaccion:
+                        v.aceleracion = 0.0
+                        continue
+
                     if i == len(vehs) - 1:
                         veh_adelante = None
                         distancia = float("inf")
                     else:
-                        v_adelante = vehs[i + 1]
-                        distancia = max(
-                            v_adelante.posicion - v.posicion - v_adelante.largo,
-                            0.1,
-                        )
-                        veh_adelante = v_adelante
-
-                    # Frenado por cebra
-                    pos_cruce_pixeles = carretera.pos_cruce
-                    pos_cruce_metros = pos_cruce_pixeles / self.ESCALA
-
-                    offset_pixeles = 70
-                    offset_metros = offset_pixeles / self.ESCALA
-
-                    pos_linea_blanca = pos_cruce_metros - offset_metros
-                    pos_parada = pos_linea_blanca - self.DISTANCIA_FRENADO_CEBRA
+                        va = vehs[i + 1]
+                        distancia = max(va.posicion - v.posicion - va.largo, 0.1)
+                        veh_adelante = va
 
                     d_cebra = pos_parada - v.posicion - v.largo
 
-                    if semaforo.estado == "rojo" and 0 < d_cebra < distancia:
+                    if (semaforo.estado in ["rojo", "amarillo"]) and 0 < d_cebra < distancia:
                         distancia = d_cebra
                         veh_adelante = self.obstaculo_fijo
 
-                    # Aceleración IDM
                     v.aceleracion = self.idm.calcular_aceleracion(
                         v, veh_adelante, distancia
                     )
 
-                # Actualizar estado de cada vehículo
+                # Actualizar vehículos
                 for v in vehs:
+                    pos_anterior = v.posicion
+
                     v.actualizar(dt)
+                    self._evaluar_cambio_de_carril(v)
 
-        # Métricas
-        self.metricas.actualizar_cola(self.vehiculos)
-        cola, t_espera_actual, vel_prom = self.metricas.calcular_todas_metricas(
-            self.vehiculos
-        )
-        t_espera_hist = self.metricas.tiempo_espera_promedio_historico()
+                    # Detector de flujo en la línea peatonal
+                    pos_detector = pos_cruce - 70 # o pos_cruce + 2.0, si quieres “después del cruce”
 
-        print(
-            f"t={self.tiempo:5.1f}s | "
-            f"Espera act={t_espera_actual:5.2f}s | "
-            f"Hist={t_espera_hist:5.2f}s | "
-            f"Cola={cola:4.1f} | "
-            f"Vel={vel_prom:5.2f} m/s"
-        )
+                    if pos_anterior < pos_detector <= v.posicion:
+                        self.metricas.registrar_paso_detector(carretera, carril)
 
-        # Limpiar vehículos fuera de pantalla
+                # -------------------------------------------------
+                # 🔥 REGISTRO DE MÉTRICAS POR CARRIL
+                # -------------------------------------------------
+                cola = sum(1 for v in vehs if v.velocidad < 0.5)
+                espera = sum(v.tiempo_parado for v in vehs)
+
+                self.metricas.registrar_cola_y_espera(
+                    carretera, carril, cola, espera
+                )
+
         self._limpiar_vehiculos()
+
+        # ---------------------------------------------------------
+        # 🔥 IMPRESIÓN DE MÉTRICAS POR VÍA (listas para tablas)
+        # ---------------------------------------------------------
+        metricas_via = self.obtener_metricas_por_via()
+
+        for direccion, datos in metricas_via.items():
+            print(
+                f"[VÍA {direccion}] cola={datos['cola']} | "
+                f"espera_prom={datos['espera']:.2f}s | flujo={datos['flujo']}"
+            )
+

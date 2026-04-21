@@ -16,7 +16,7 @@
 
 Con el entorno virtual activado:
 
-    . pip install -r requirements.txt
+    pip install -r requirements.txt
 
 ▶️ Ejecutar el simulador
 
