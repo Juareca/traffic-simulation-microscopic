@@ -10,8 +10,9 @@ class Metricas:
                     "hist_cola": [],
                     "hist_espera": [],
                     "conteo_detector": 0,
-                    # 🔥 valor “congelado” de espera
+                    # valor promedio de espera por carril en el instante actual
                     "espera_congelada": 0.0,
+                    "vehiculos_parados": 0,
                 }
 
     def _id_carril(self, carretera, carril):
@@ -21,10 +22,14 @@ class Metricas:
         cid = self._id_carril(carretera, carril)
         datos = self.datos_carriles[cid]
 
-        # Si hay cola, actualizamos la espera “congelada”
+        # Si hay cola, guardamos el promedio de espera del carril.
+        # Si no hay cola, se restablece a cero para evitar valores antiguos.
         if cola > 0:
             datos["espera_congelada"] = tiempo_espera
-        # Si cola == 0, NO tocamos espera_congelada: queda el último valor
+        else:
+            datos["espera_congelada"] = 0.0
+
+        datos["vehiculos_parados"] = cola
 
         datos["hist_cola"].append(cola)
         datos["hist_espera"].append(datos["espera_congelada"])

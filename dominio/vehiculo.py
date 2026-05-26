@@ -1,10 +1,20 @@
 import random
+from dominio.config import (
+    T_MIN, T_MAX,
+    A_MAX_MIN, A_MAX_MAX,
+    B_MIN, B_MAX,
+    TIEMPO_REACCION_MIN, TIEMPO_REACCION_MAX,
+    LARGO_VEHICULO, V0_MAX, V0_MIN,
+    VELOCIDAD_PARADA_UMBRAL,
+    VELOCIDAD_SIMULACION
+)
+
 
 class Vehiculo:
     """Representa un vehículo en la simulación de tráfico."""
 
     # Velocidad deseada global (m/s)
-    v0 = 6.0  # 🔥 4–8 m/s urbano realista
+    v0 = random.uniform(V0_MIN, V0_MAX)
 
     def __init__(self, id, posicion=0.0, velocidad=0.0):
         self.id = id
@@ -20,32 +30,38 @@ class Vehiculo:
 
         # Parámetros individuales (IDM)
         self.v0 = Vehiculo.v0
-        self.T = random.uniform(1.2, 2.0)        # reacción conductor
-        self.a_max = random.uniform(0.5, 1.2)    # 🔥 MÁS LENTO (clave)
-        self.b = random.uniform(2.0, 3.5)
+        self.T = random.uniform(T_MIN, T_MAX)                          # reacción conductor
+        self.a_max = random.uniform(A_MAX_MIN, A_MAX_MAX)              # aceleración máxima
+        self.b = random.uniform(B_MIN, B_MAX)                          # desaceleración máxima
 
         # 🔥 IMPORTANTE: tiempo de reacción humano
-        self.tiempo_reaccion = random.uniform(0.8, 1.5)
+        self.tiempo_reaccion = random.uniform(TIEMPO_REACCION_MIN, TIEMPO_REACCION_MAX)
 
         # Métricas
         self.tiempo_parado = 0.0
         self.tiempo_espera = 0.0
 
         # Dimensión física
-        self.largo = 4.5  # 🚗 más realista que 2m
+        self.largo = LARGO_VEHICULO
+
+        # Medida de flujo: ya cruzó la línea/cebra
+        self.ha_cruzado_detector = False
 
     def actualizar(self, dt):
+
+        dt_sim = dt 
+
         self.posicion_anterior = self.posicion
 
         # Integración
-        self.velocidad += self.aceleracion * dt
+        self.velocidad += self.aceleracion * dt_sim
         self.velocidad = max(0.0, self.velocidad)
 
-        self.posicion += self.velocidad * dt
+        self.posicion += self.velocidad * dt_sim
 
         # Estado de parada
-        if self.velocidad <= 0.1:
-            self.tiempo_parado += dt
-            self.tiempo_espera += dt
+        if self.velocidad <= VELOCIDAD_PARADA_UMBRAL:
+            self.tiempo_parado += dt_sim
+            self.tiempo_espera += dt_sim
         else:
             self.tiempo_parado = 0.0

@@ -12,7 +12,8 @@ from dominio.idm import IDM
 from dominio.metricas import Metricas
 from dominio.semaforo import Semaforo
 from control.controlador_semaforos import ControladorSemaforos
-from dominio.config import ESCALA
+from dominio import config
+
 
 class Obstaculo:
     """Obstáculo fijo usado por el IDM (p.ej. semáforo en rojo o línea de cebra)."""
@@ -20,10 +21,10 @@ class Obstaculo:
         self.velocidad = 0.0
         self.largo = 0.0
 
-class Simulacion:
+class Simulacion():
 
-    ESCALA = ESCALA
-    DISTANCIA_FRENADO_CEBRA = 3.0
+    ESCALA = config.ESCALA
+    DISTANCIA_FRENADO_CEBRA = config.DISTANCIA_FRENADO_CEBRA
 
     def __init__(self, ancho, alto, grosor, debug=False, seed=None):
 
@@ -32,6 +33,8 @@ class Simulacion:
 
         if seed is not None:
             random.seed(seed)
+
+        self.en_ejecucion = True
 
         self.debug = debug
         self.seed = seed
@@ -48,18 +51,18 @@ class Simulacion:
 
         # Semáforos
         self.semaforos = {
-            "S-N": Semaforo(40),
-            "N-S": Semaforo(40),
-            "O-E": Semaforo(40),
-            "E-O": Semaforo(40),
+            "S-N": Semaforo(config.SEMAFORO_POSICION),
+            "N-S": Semaforo(config.SEMAFORO_POSICION),
+            "O-E": Semaforo(config.SEMAFORO_POSICION),
+            "E-O": Semaforo(config.SEMAFORO_POSICION),
         }
 
-        # 🔥 Tasa de tráfico (veh/s por dirección)
+        # 🔥 Tasa de tráfico (veh/min por dirección) - DATOS REALES PARA GEH
         self.trafico_por_direccion = {
-            "N-S": 20,
-            "S-N": 20,
-            "E-O": 20,
-            "O-E": 20
+            "N-S": config.TRAFICO_NORTE_SUR,
+            "S-N": config.TRAFICO_SUR_NORTE,
+            "E-O": config.TRAFICO_ESTE_OESTE,
+            "O-E": config.TRAFICO_OESTE_ESTE
         }
 
         self.acumulador_generacion = {
@@ -74,15 +77,40 @@ class Simulacion:
                 "O-E": self.semaforos["O-E"],
             },
             tiempos={
-                "N-S": {"verde": 10, "amarillo": 2},
-                "S-N": {"verde": 10, "amarillo": 2},
-                "E-O": {"verde": 10, "amarillo": 2},
-                "O-E": {"verde": 10, "amarillo": 2},
+                "N-S": {"verde": config.NORTE_SUR_TIEMPO_VERDE, "amarillo": config.SEMAFORO_TIEMPO_AMARILLO},
+                "S-N": {"verde": config.SUR_NORTE_TIEMPO_VERDE, "amarillo": config.SEMAFORO_TIEMPO_AMARILLO},
+                "E-O": {"verde": config.ESTE_OESTE_TIEMPO_VERDE, "amarillo": config.SEMAFORO_TIEMPO_AMARILLO},
+                "O-E": {"verde": config.OESTE_ESTE_TIEMPO_VERDE, "amarillo": config.SEMAFORO_TIEMPO_AMARILLO},
             }
         )
 
         self.vehiculos = []
         self._inicio_impreso = False
+    
+    def iniciar(self):
+        self.en_ejecucion = True
+
+    def pausar(self):
+        self.en_ejecucion = False
+
+    def reiniciar(self):
+        self.tiempo = 0.0
+        self.vehiculos = []
+
+        for carretera in self.carreteras:
+            for carril in carretera.carriles:
+                carril.vehiculos = []
+
+        self.metricas.reiniciar()
+
+        for sem in self.semaforos.values():
+            sem.reiniciar()
+
+        self.en_ejecucion = True   
+
+    def cambiar_velocidad(self, factor):
+        """Actualiza la velocidad de simulación en la capa de dominio."""
+        config.VELOCIDAD_SIMULACION = factor
 
     # -------------------------------------------------------------
     def _crear_carreteras(self, ancho, alto, grosor):
@@ -90,16 +118,17 @@ class Simulacion:
         cy = alto // 2
 
         return [
-            Carretera(cx - grosor, 0, grosor, alto, "N-S", 2),
-            Carretera(cx, 0, grosor, alto, "S-N", 2),
-            Carretera(0, cy - grosor, ancho, grosor, "E-O", 2),
-            Carretera(0, cy, ancho, grosor, "O-E", 2),
+            Carretera(cx - grosor, 0, grosor, alto,  config.CARRILES_POR_CARRETERA, "N-S"),
+            Carretera(cx, 0, grosor, alto, config.CARRILES_POR_CARRETERA, "S-N"),
+            Carretera(0, cy - grosor, ancho, grosor, config.CARRILES_POR_CARRETERA, "E-O"),
+            Carretera(0, cy, ancho, grosor, config.CARRILES_POR_CARRETERA, "O-E"),
         ]
 
     # -------------------------------------------------------------
-    def _crear_vehiculo(self, velocidad, carril):
+    def _crear_vehiculo(self, velocidad, carril, v0=None):
 
-        v0 = random.uniform(4.0, 8.0)
+        if v0 is None:
+            v0 = random.uniform(config.V0_MIN, config.V0_MAX)
 
         nuevo = Vehiculo(
             id=self.contador_ids,
@@ -108,9 +137,9 @@ class Simulacion:
         )
 
         nuevo.v0 = v0
-        nuevo.T = random.uniform(1.2, 1.8)
-        nuevo.a_max = random.uniform(0.8, 1.5)
-        nuevo.b = random.uniform(2.0, 3.5)
+        nuevo.T = random.uniform(config.T_SPAWN_MIN, config.T_SPAWN_MAX)
+        nuevo.a_max = random.uniform(config.A_MAX_SPAWN_MIN, config.A_MAX_SPAWN_MAX)
+        nuevo.b = random.uniform(config.B_MIN, config.B_MAX)
 
         nuevo.carril = carril
 
@@ -128,21 +157,21 @@ class Simulacion:
         for carril in carriles:
 
             if not carril.vehiculos:
-                velocidad = random.uniform(0.5, 2.0)
-                return self._crear_vehiculo(velocidad, carril)
+                v0 = random.uniform(config.V0_MIN, config.V0_MAX)
+                return self._crear_vehiculo(v0, carril, v0=v0)
 
             primer = min(carril.vehiculos, key=lambda v: v.posicion)
 
-            velocidad = min(primer.velocidad, random.uniform(4.0, 8.0))
-            velocidad = max(2.0, velocidad)
+            v0 = random.uniform(config.V0_MIN, config.V0_MAX)
+            velocidad = min(primer.velocidad, v0)
+            velocidad = max(config.VELOCIDAD_MINIMA, velocidad)
 
-            T_spawn = 1.5
-            gap = self.idm.s0 + velocidad * T_spawn
+            gap = self.idm.s0 + velocidad * config.T_SPAWN
 
             if primer.posicion <= gap:
                 continue
 
-            return self._crear_vehiculo(velocidad, carril)
+            return self._crear_vehiculo(velocidad, carril, v0=v0)
 
         return False
 
@@ -176,7 +205,10 @@ class Simulacion:
                 x = carretera.x + carretera.ancho - pos_px
                 y = carretera.y + carretera.alto // 2
 
-            if x < -50 or x > self.ancho_pantalla + 50 or y < -50 or y > self.alto_pantalla + 50:
+            if (x < -config.MARGEN_LIMPIEZA_VEHICULOS or 
+                x > self.ancho_pantalla + config.MARGEN_LIMPIEZA_VEHICULOS or 
+                y < -config.MARGEN_LIMPIEZA_VEHICULOS or 
+                y > self.alto_pantalla + config.MARGEN_LIMPIEZA_VEHICULOS):
                 fuera.append(v)
             else:
                 dentro.append(v)
@@ -198,9 +230,9 @@ class Simulacion:
             carriles = carretera.carriles
 
             cola_total = 0
-            espera_total = 0
             flujo_total = 0
-            num_carriles = len(carriles)
+            espera_total_vehiculos = 0.0
+            vehiculos_parados_total = 0
 
             for carril in carriles:
                 hist_cola = self.metricas.obtener_historial_cola(carretera, carril)
@@ -208,15 +240,17 @@ class Simulacion:
                 cola_total += cola_actual
 
                 cid = f"{carretera.direccion}_{carril.indice}"
-                espera_actual = self.metricas.datos_carriles[cid]["espera_congelada"]
-                espera_total += espera_actual
+                espera_promedio_carril = self.metricas.datos_carriles[cid]["espera_congelada"]
+                parados_carril = self.metricas.datos_carriles[cid]["vehiculos_parados"]
+                espera_total_vehiculos += espera_promedio_carril * parados_carril
+                vehiculos_parados_total += parados_carril
 
                 flujo = self.metricas.obtener_conteo_flujo(carretera, carril)
                 flujo_total += flujo
 
             resultados[direccion] = {
                 "cola": cola_total,
-                "espera": espera_total / num_carriles,
+                "espera": espera_total_vehiculos / vehiculos_parados_total if vehiculos_parados_total > 0 else 0.0,
                 "flujo": flujo_total
             }
 
@@ -225,17 +259,22 @@ class Simulacion:
     # -------------------------------------------------------------
     def paso(self, dt):
 
-        self.tiempo += dt
-        self.controlador_semaforos.actualizar(dt)
+        if not self.en_ejecucion:
+            return
+
+        dt_real = dt
+        dt_simulado = dt_real * config.VELOCIDAD_SIMULACION
+        self.tiempo += dt_simulado
+        self.controlador_semaforos.actualizar(dt_simulado)
 
         # ---------------------------------------------------------
-        # 🔥 GENERACIÓN DE VEHÍCULOS (veh/h → veh/s)
+        # GENERACIÓN DE VEHÍCULOS (veh/h → veh/s)
         # ---------------------------------------------------------
         for carretera in self.carreteras:
             d = carretera.direccion
             tasa = self.trafico_por_direccion[d] / 60.0
 
-            self.acumulador_generacion[d] += tasa * dt
+            self.acumulador_generacion[d] += tasa * dt_simulado
 
             while self.acumulador_generacion[d] >= 1.0:
 
@@ -249,7 +288,7 @@ class Simulacion:
                     break
 
         # ---------------------------------------------------------
-        # 🔥 DINÁMICA + REGISTRO DE MÉTRICAS
+        # DINÁMICA + REGISTRO DE MÉTRICAS
         # ---------------------------------------------------------
         for carretera in self.carreteras:
 
@@ -266,7 +305,7 @@ class Simulacion:
                 # Calcular aceleraciones
                 for i, v in enumerate(vehs):
 
-                    if v.velocidad <= 0.1 and v.tiempo_parado < v.tiempo_reaccion:
+                    if v.velocidad <= config.VELOCIDAD_PARADA_UMBRAL and v.tiempo_parado < v.tiempo_reaccion:
                         v.aceleracion = 0.0
                         continue
 
@@ -292,35 +331,39 @@ class Simulacion:
                 for v in vehs:
                     pos_anterior = v.posicion
 
-                    v.actualizar(dt)
+                    v.actualizar(dt_simulado)
                     self._evaluar_cambio_de_carril(v)
 
                     # Detector de flujo en la línea peatonal
-                    pos_detector = pos_cruce - 70 # o pos_cruce + 2.0, si quieres “después del cruce”
+                    pos_detector = pos_cruce - (config.DISTANCIA_DETECTOR_CEBRA_PX / self.ESCALA)
 
-                    if pos_anterior < pos_detector <= v.posicion:
+                    if not v.ha_cruzado_detector and pos_anterior < pos_detector <= v.posicion:
                         self.metricas.registrar_paso_detector(carretera, carril)
+                        v.ha_cruzado_detector = True
 
                 # -------------------------------------------------
-                # 🔥 REGISTRO DE MÉTRICAS POR CARRIL
+                # REGISTRO DE MÉTRICAS POR CARRIL
                 # -------------------------------------------------
-                cola = sum(1 for v in vehs if v.velocidad < 0.5)
-                espera = sum(v.tiempo_parado for v in vehs)
+                cola = sum(1 for v in vehs if v.velocidad < config.VELOCIDAD_COLA_UMBRAL)
+                espera_total = sum(
+                    v.tiempo_parado for v in vehs if v.velocidad < config.VELOCIDAD_COLA_UMBRAL
+                )
+                espera_promedio = espera_total / cola if cola > 0 else 0.0
 
                 self.metricas.registrar_cola_y_espera(
-                    carretera, carril, cola, espera
+                    carretera, carril, cola, espera_promedio
                 )
 
         self._limpiar_vehiculos()
 
         # ---------------------------------------------------------
-        # 🔥 IMPRESIÓN DE MÉTRICAS POR VÍA (listas para tablas)
+        # IMPRESIÓN DE MÉTRICAS POR VÍA
         # ---------------------------------------------------------
         metricas_via = self.obtener_metricas_por_via()
 
         for direccion, datos in metricas_via.items():
             print(
                 f"[VÍA {direccion}] cola={datos['cola']} | "
-                f"espera_prom={datos['espera']:.2f}s | flujo={datos['flujo']}"
+                f"espera_prom={round(datos['espera'])}s | flujo={datos['flujo']}"
             )
 

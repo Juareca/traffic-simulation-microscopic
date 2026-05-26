@@ -7,7 +7,7 @@ class Carretera:
     Maneja geometría, dirección, carriles y posición del cruce.
     """
 
-    def __init__(self, x, y, ancho, alto, direccion=None, num_carriles=3):
+    def __init__(self, x, y, ancho, alto, num_carriles, direccion=None):
         self.x = x                  # posición en pantalla (px)
         self.y = y
         self.ancho = ancho          # tamaño en pantalla (px)

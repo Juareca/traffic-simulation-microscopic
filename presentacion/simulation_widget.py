@@ -1,30 +1,31 @@
 from PySide6.QtWidgets import QApplication, QWidget
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QPainter, QColor
+from PySide6.QtGui import QPainter, QPen, QBrush
 from dominio.config import ESCALA
+from presentacion.visual_settings import COLOR_BACKGROUND, COLOR_LIGHT_GREEN, COLOR_LIGHT_RED, COLOR_LIGHT_YELLOW, COLOR_LINES, COLOR_ROAD, COLOR_VEHICLE
 
 class SimulationWidget(QWidget):
-    def __init__(self, simulacion):
+    def __init__(self, controlador):
         super().__init__()
         
-        # Crear simulación correctamente
-        self.simulacion = simulacion 
+        self.controlador = controlador
+        self.simulacion = controlador.simulacion
 
         self.setFocusPolicy(Qt.StrongFocus)
 
-        # Timer a 60 FPS
+        # Timer a 60 FPS (16.67ms por frame)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.actualizar)
         self.timer.start(16)
 
         # Colores
-        self.color_fondo = QColor("white")
-        self.color_carretera = QColor("gray")
-        self.color_vehiculo = QColor("blue")
-        self.color_semaforo_verde = QColor("green")
-        self.color_semaforo_amarillo = QColor("yellow")
-        self.color_semaforo_rojo = QColor("red")
-        self.color_linea = QColor(255, 255, 255)
+        self.color_fondo = COLOR_BACKGROUND
+        self.color_carretera = COLOR_ROAD   
+        self.color_vehiculo = COLOR_VEHICLE
+        self.color_semaforo_verde = COLOR_LIGHT_GREEN
+        self.color_semaforo_amarillo = COLOR_LIGHT_YELLOW
+        self.color_semaforo_rojo = COLOR_LIGHT_RED
+        self.color_linea = COLOR_LINES
 
         # Parámetros visuales
         self.ESCALA = ESCALA
@@ -32,12 +33,45 @@ class SimulationWidget(QWidget):
         self.LARGO_VEHICULO = 20
         self.ALTO_VEHICULO = 10
         self.RADIO_SEMAFORO = 8
+        
+        # Pre-crear pinceles y plumas para evitar asignaciones en cada frame
+        self.brush_fondo = QBrush(self.color_fondo)
+        self.brush_carretera = QBrush(self.color_carretera)
+        self.brush_vehiculo = QBrush(self.color_vehiculo)
+        self.brush_linea = QBrush(self.color_linea)
+        
+        self.brush_semaforo_rojo = QBrush(self.color_semaforo_rojo)
+        self.brush_semaforo_amarillo = QBrush(self.color_semaforo_amarillo)
+        self.brush_semaforo_verde = QBrush(self.color_semaforo_verde)
+        
+        self.pen_carril = QPen(self.color_linea)
+        self.pen_carril.setStyle(Qt.DashLine)
+        self.pen_carril.setWidth(1)
+        
+        self.pen_cebra = QPen(self.color_linea)
+        self.pen_cebra.setWidth(2)
+
+        # Parámetros de animación
+        self.frame_count = 0
+
+    
+    def iniciar(self):
+        self.controlador.iniciar()
+
+    def pausar(self):
+        self.controlador.pausar()
+
+    def reiniciar(self):
+        self.controlador.reiniciar()
+
+    def cambiar_velocidad(self, factor):
+        self.controlador.cambiar_velocidad(factor)
 
     # ------------------------------------------------------------------
     # Actualización
     # ------------------------------------------------------------------
     def actualizar(self):
-        self.simulacion.paso(0.016)
+        self.controlador.paso(0.016)
         self.update()
     
     def keyPressEvent(self, event):
@@ -47,12 +81,13 @@ class SimulationWidget(QWidget):
     # ------------------------------------------------------------------
     # Helpers de dibujo
     # ------------------------------------------------------------------
-    def _color_semaforo(self, sem):
+    def _brush_semaforo(self, sem):
+        """Retorna brush precreado según estado del semáforo."""
         if sem.estado == "rojo":
-            return self.color_semaforo_rojo
+            return self.brush_semaforo_rojo
         if sem.estado == "amarillo":
-            return self.color_semaforo_amarillo
-        return self.color_semaforo_verde
+            return self.brush_semaforo_amarillo
+        return self.brush_semaforo_verde
 
     def _pos_semaforo(self, carretera, sem):
         centro_x = self.width() // 2
@@ -111,81 +146,81 @@ class SimulationWidget(QWidget):
         return int(x), int(y)
 
     def _dibujar_cebra(self, painter):
-        painter.setBrush(self.color_linea)
-        painter.setPen(self.color_linea)
-
+        """Dibuja las líneas de parada (cebra) de forma optimizada."""
         grosor_linea = 4
         offset = 70  # distancia desde el centro
         ancho_carretera = 120  # ajusta a gusto
 
         centro_x = self.width() // 2
         centro_y = self.height() // 2
+        
+        painter.setBrush(self.brush_linea)
 
-        # Vertical superior
-        painter.drawRect(
-            int(centro_x - ancho_carretera // 2),
-            int(centro_y - offset) ,
-            int(ancho_carretera),
-            grosor_linea
-        )
-
-        # Vertical inferior
-        painter.drawRect(
-            int(centro_x - ancho_carretera // 2),
-            int(centro_y + offset),
-            int(ancho_carretera),
-            grosor_linea
-        )
-
-        # Horizontal izquierda
-        painter.drawRect(
-            int(centro_x - offset) - 5,
-            int(centro_y - ancho_carretera // 2),
-            grosor_linea,
-            int(ancho_carretera)
-        )
-
-        # Horizontal derecha
-        painter.drawRect(
-            int(centro_x + offset) + 5,
-            int(centro_y - ancho_carretera // 2),
-            grosor_linea,
-            int(ancho_carretera)
-        )
+        # Dibujar 4 rectángulos (cebra en 4 direcciones)
+        rects = [
+            # Vertical superior
+            (int(centro_x - ancho_carretera // 2), int(centro_y - offset), int(ancho_carretera), grosor_linea),
+            # Vertical inferior
+            (int(centro_x - ancho_carretera // 2), int(centro_y + offset), int(ancho_carretera), grosor_linea),
+            # Horizontal izquierda
+            (int(centro_x - offset), int(centro_y - ancho_carretera // 2), grosor_linea, int(ancho_carretera)),
+            # Horizontal derecha
+            (int(centro_x + offset), int(centro_y - ancho_carretera // 2), grosor_linea, int(ancho_carretera)),
+        ]
+        
+        for x, y, w, h in rects:
+            painter.drawRect(x, y, w, h)
 
     def _dibujar_lineas_carril(self, painter, carretera):
-        painter.setPen(self.color_linea)
-        painter.setPen(Qt.DashLine)
+        painter.setPen(self.pen_carril)
 
+        num = len(carretera.carriles)
+
+        # No dibujar líneas si solo hay 1 carril
+        if num <= 1:
+            return
+
+        # Distancia entre líneas
         if carretera.direccion in ("O-E", "E-O"):
-            y = carretera.y + carretera.alto / 2
-            painter.drawLine(
-                int(carretera.x),
-                int(y),
-                int(carretera.x + carretera.ancho),
-                int(y)
-            )
+            # Carretera horizontal
+            alto = carretera.alto
+            for i in range(1, num):
+                y = carretera.y + (i * alto / num)
+                painter.drawLine(
+                    int(carretera.x),
+                    int(y),
+                    int(carretera.x + carretera.ancho),
+                    int(y)
+                )
         else:
-            x = carretera.x + carretera.ancho / 2
-            painter.drawLine(
-                int(x),
-                int(carretera.y),
-                int(x),
-                int(carretera.y + carretera.alto)
-            )
-        painter.setPen(Qt.SolidLine)
+            # Carretera vertical
+            ancho = carretera.ancho
+            for i in range(1, num):
+                x = carretera.x + (i * ancho / num)
+                painter.drawLine(
+                    int(x),
+                    int(carretera.y),
+                    int(x),
+                    int(carretera.y + carretera.alto)
+                )
+
 
     # ------------------------------------------------------------------
     # Dibujo principal
     # ------------------------------------------------------------------
     def paintEvent(self, event):
         painter = QPainter(self)
+        
+        # 🚀 OPTIMIZACIÓN 1: Activar anti-aliasing y suavizado
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
 
         # Fondo
-        painter.fillRect(self.rect(), self.color_fondo)
+        painter.fillRect(self.rect(), self.brush_fondo)
 
         # Carreteras + líneas de carril
-        painter.setBrush(self.color_carretera)
+        painter.setBrush(self.brush_carretera)
+        painter.setPen(Qt.NoPen)  # Sin borde para mejor rendimiento
         for carretera in self.simulacion.carreteras:
             painter.drawRect(
                 int(carretera.x),
@@ -193,15 +228,21 @@ class SimulationWidget(QWidget):
                 int(carretera.ancho),
                 int(carretera.alto)
             )
-            
+        
+        # Líneas de carril
+        painter.setPen(self.pen_carril)
+        for carretera in self.simulacion.carreteras:
             self._dibujar_lineas_carril(painter, carretera)
+            
         # Cebra
+        painter.setPen(self.pen_cebra)
         self._dibujar_cebra(painter)
 
         # Semáforos (4)
+        painter.setPen(Qt.NoPen)
         for carretera in self.simulacion.carreteras:
             sem = self.simulacion.semaforos[carretera.direccion]
-            painter.setBrush(self._color_semaforo(sem))
+            painter.setBrush(self._brush_semaforo(sem))
             x, y = self._pos_semaforo(carretera, sem)
             painter.drawEllipse(
                 x - self.RADIO_SEMAFORO,
@@ -211,6 +252,8 @@ class SimulationWidget(QWidget):
             )
 
         # Vehículos
+        painter.setBrush(self.brush_vehiculo)
+        painter.setPen(Qt.NoPen)
         for carretera in self.simulacion.carreteras:
             for carril in carretera.carriles:
                 for v in carril.vehiculos:
@@ -224,11 +267,12 @@ class SimulationWidget(QWidget):
                         w = self.ALTO_VEHICULO
                         h = self.LARGO_VEHICULO
 
-                    painter.setBrush(self.color_vehiculo)
                     painter.drawRect(
                         x - w // 2,
                         y - h // 2,
                         w,
                         h
                     )
+        
+        painter.end()
 

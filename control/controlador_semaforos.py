@@ -1,3 +1,6 @@
+from dominio.config import FASES_SEMAFORO, VELOCIDAD_SIMULACION
+
+
 class ControladorSemaforos:
     """
     Controlador de fases semafóricas.
@@ -9,34 +12,35 @@ class ControladorSemaforos:
         self.semaforos = semaforos
         self.tiempos = tiempos
 
-        self.fases = ["N-S", "S-N", "E-O", "O-E"]
+        self.fases = FASES_SEMAFORO
         self.fase_actual = 0
         self.tiempo_fase = 0.0
 
     def actualizar(self, dt):
+        dt_sim = dt
         fase = self.fases[self.fase_actual]
         t_verde = self.tiempos[fase]["verde"]
         t_amarillo = self.tiempos[fase]["amarillo"]
-        t_total = t_verde + t_amarillo
+        t_fase_total = t_verde + t_amarillo  # Duración de esta fase
 
-        self.tiempo_fase += dt
+        self.tiempo_fase += dt_sim
 
         # Estado del semáforo activo
         if self.tiempo_fase < t_verde:
             estado = "verde"
-        elif self.tiempo_fase < t_total:
+        elif self.tiempo_fase < t_fase_total:
             estado = "amarillo"
         else:
             estado = "rojo"
 
-        # Aplicar estado al semáforo activo
+        # Aplicar estado a los semáforos
         for key, sem in self.semaforos.items():
             if key == fase:
                 sem.estado = estado
             else:
                 sem.estado = "rojo"
 
-        # Cambio de fase
-        if self.tiempo_fase >= t_total:
+        # Cambio de fase al completar la fase actual
+        if self.tiempo_fase >= t_fase_total:
             self.fase_actual = (self.fase_actual + 1) % len(self.fases)
             self.tiempo_fase = 0.0

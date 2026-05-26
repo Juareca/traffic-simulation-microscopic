@@ -1,5 +1,6 @@
 import math
 from dominio.vehiculo import Vehiculo
+from dominio.config import IDM_V0, IDM_T, IDM_A_MAX, IDM_B, IDM_S0, IDM_DELTA
 
 
 class IDM:
@@ -7,12 +8,12 @@ class IDM:
 
     def __init__(self):
         # parámetros base (fallback / referencia)
-        self.v0 = Vehiculo.v0
-        self.T = 1.5
-        self.a_max = 2.0
-        self.b = 5.0
-        self.s0 = 6.0
-        self.delta = 4
+        self.v0 = IDM_V0
+        self.T = IDM_T
+        self.a_max = IDM_A_MAX
+        self.b = IDM_B
+        self.s0 = IDM_S0
+        self.delta = IDM_DELTA
 
     # ------------------------------------------------------------------
     # Aceleración IDM
