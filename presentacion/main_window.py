@@ -120,4 +120,3 @@ class MainWindow(QMainWindow):
     # ================================
     def cambiar_velocidad(self, factor):
         self.controlador.cambiar_velocidad(factor)
-        print(f"[INFO] Velocidad cambiada a x{factor}")

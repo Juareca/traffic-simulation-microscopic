@@ -1,6 +1,6 @@
 import math
 from dominio.vehiculo import Vehiculo
-from dominio.config import IDM_V0, IDM_T, IDM_A_MAX, IDM_B, IDM_S0, IDM_DELTA
+from dominio.config import IDM_T, IDM_A_MAX, IDM_B, IDM_S0, IDM_DELTA
 
 
 class IDM:
@@ -8,7 +8,6 @@ class IDM:
 
     def __init__(self):
         # parámetros base (fallback / referencia)
-        self.v0 = IDM_V0
         self.T = IDM_T
         self.a_max = IDM_A_MAX
         self.b = IDM_B
@@ -22,7 +21,7 @@ class IDM:
         v = vehiculo.velocidad
 
         # parámetros individuales (si existen)
-        v0 = getattr(vehiculo, "v0", self.v0)
+        v0 = getattr(vehiculo, "v0", 6.0)  # fallback razonable
         T = getattr(vehiculo, "T", self.T)
         a_max = getattr(vehiculo, "a_max", self.a_max)
         b = getattr(vehiculo, "b", self.b)
@@ -42,13 +41,10 @@ class IDM:
         # -------------------------------
         delta_v = v - vehiculo_adelante.velocidad
 
-        # evitar sqrt repetido innecesario
         sqrt_term = 2 * math.sqrt(a_max * b)
 
-        # distancia deseada dinámica
         s_star = self.s0 + v * T + (v * delta_v) / sqrt_term
 
-        # evitar división peligrosa
         s = max(s, 0.1)
         s_star = max(s_star, self.s0)
 
@@ -62,7 +58,7 @@ class IDM:
         )
 
         # -------------------------------
-        # 🔹 4. Clamp físico (MUY IMPORTANTE)
+        # 🔹 4. Clamp físico
         # -------------------------------
         return max(-b * 2, min(a, a_max))
 
@@ -70,10 +66,4 @@ class IDM:
     # Distancia mínima para generación
     # ------------------------------------------------------------------
     def distancia_deseada_minima(self, velocidad, T=1.2):
-        """
-        Distancia segura sin interacción (Δv = 0).
-        Usada para generación de vehículos.
-
-        T más bajo que el real → evita bloqueos en spawn.
-        """
         return self.s0 + velocidad * T

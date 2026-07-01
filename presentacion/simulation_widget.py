@@ -71,7 +71,7 @@ class SimulationWidget(QWidget):
     # Actualización
     # ------------------------------------------------------------------
     def actualizar(self):
-        self.controlador.paso(0.016)
+        self.controlador.paso(0.016) # Simular paso de 16ms (60 FPS)
         self.update()
     
     def keyPressEvent(self, event):
@@ -95,23 +95,23 @@ class SimulationWidget(QWidget):
 
         # S-N → semáforo abajo del cruce (vehículos suben)
         if carretera.direccion == "S-N":
-            x = centro_x
+            x = centro_x + 10
             y = centro_y + 120
 
         # N-S → semáforo arriba del cruce (vehículos bajan)
         elif carretera.direccion == "N-S":
-            x = centro_x
-            y = centro_y - 120
+            x = centro_x + 10
+            y = centro_y - 80
 
         # O-E → semáforo a la izquierda del cruce (vehículos van →)
         elif carretera.direccion == "O-E":
             x = centro_x - 120
-            y = centro_y
+            y = centro_y + 10
 
         # E-O <- semáforo a la derecha del cruce (vehículos van ←)
         else:  # "E-O"
             x = centro_x + 120
-            y = centro_y 
+            y = centro_y + 10
 
         return int(x), int(y)
 
@@ -159,13 +159,13 @@ class SimulationWidget(QWidget):
         # Dibujar 4 rectángulos (cebra en 4 direcciones)
         rects = [
             # Vertical superior
-            (int(centro_x - ancho_carretera // 2), int(centro_y - offset), int(ancho_carretera), grosor_linea),
+            (int(centro_x + 8 - ancho_carretera // 2), int(centro_y - offset + 20), int(ancho_carretera), grosor_linea),
             # Vertical inferior
-            (int(centro_x - ancho_carretera // 2), int(centro_y + offset), int(ancho_carretera), grosor_linea),
+            (int(centro_x + 8 - ancho_carretera // 2), int(centro_y + offset + 20), int(ancho_carretera), grosor_linea),
             # Horizontal izquierda
-            (int(centro_x - offset), int(centro_y - ancho_carretera // 2), grosor_linea, int(ancho_carretera)),
+            (int(centro_x - offset + 8), int(centro_y - ancho_carretera // 2 + 20), grosor_linea, int(ancho_carretera)),
             # Horizontal derecha
-            (int(centro_x + offset), int(centro_y - ancho_carretera // 2), grosor_linea, int(ancho_carretera)),
+            (int(centro_x + offset + 8), int(centro_y - ancho_carretera // 2 + 20), grosor_linea, int(ancho_carretera)),
         ]
         
         for x, y, w, h in rects:

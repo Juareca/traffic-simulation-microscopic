@@ -60,16 +60,9 @@ IDM_DELTA = 4     # exponente de aceleración
 # 🚦 SEMÁFOROS — INTERSECCIÓN REAL
 # ==================================================================================
 # Tiempos de fases (segundos)
-NORTE_SUR_TIEMPO_ROJO = 115
 NORTE_SUR_TIEMPO_VERDE = 28
-
-SUR_NORTE_TIEMPO_ROJO = 113
 SUR_NORTE_TIEMPO_VERDE = 33
-
-ESTE_OESTE_TIEMPO_ROJO = 120
 ESTE_OESTE_TIEMPO_VERDE = 30
-
-OESTE_ESTE_TIEMPO_ROJO = 111
 OESTE_ESTE_TIEMPO_VERDE = 36
 
 SEMAFORO_TIEMPO_AMARILLO = 3  # segundos
@@ -87,8 +80,8 @@ FASES_SEMAFORO = ["N-S", "S-N", "E-O", "O-E"]
 # Tasa de tráfico por dirección (veh/min)
 TRAFICO_NORTE_SUR = 35.71
 TRAFICO_SUR_NORTE = 34.54
-TRAFICO_ESTE_OESTE = 22.67
-TRAFICO_OESTE_ESTE = 18.56
+TRAFICO_ESTE_OESTE = 18.56
+TRAFICO_OESTE_ESTE = 22.67
 
 # Velocidad mínima permitida (m/s)
 VELOCIDAD_MINIMA = 2.0

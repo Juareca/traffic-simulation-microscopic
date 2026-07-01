@@ -45,9 +45,9 @@ ZEBRA_LINE_WIDTH = 2
 # ============================================================================
 # 🚦 COLORES
 # ============================================================================
-COLOR_BACKGROUND = "black"
+COLOR_BACKGROUND = "white"
 COLOR_ROAD = "gray"
-COLOR_VEHICLE = "white"
+COLOR_VEHICLE = "blue"
 COLOR_LIGHT_RED = "red"
 COLOR_LIGHT_YELLOW = "yellow"
 COLOR_LIGHT_GREEN = "green"
