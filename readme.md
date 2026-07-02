@@ -94,34 +94,6 @@ Este repositorio presenta un resumen técnico y la arquitectura general del sist
   <img src="./img/capas.png" width="85%">
 </p>
 
-<pre>
-+------------------------------+
-|        Interfaz (GUI)        |
-+---------------+--------------+
-                |
-                v
-+------------------------------+
-|         Controlador          |
-|  (Simulación + Semáforos)    |
-+---------------+--------------+
-                |
-                v
-+------------------------------+
-|         Modelo IDM           |
-|  (Vehículos + Interacciones) |
-+---------------+--------------+
-                |
-                v
-+------------------------------+
-|          Métricas            |
-+------------------------------+
-                |
-                v
-+------------------------------+
-|          Resultados          |
-+------------------------------+
-</pre>
-
 <hr>
 
 <h2>📊 Resultados y Visualizaciones</h2>
@@ -150,7 +122,8 @@ Este repositorio presenta un resumen técnico y la arquitectura general del sist
 │
 ├── control/                
 ├── presentacion/            
-├── persistencia/              
+├── persistencia/  
+├── dominio/  
 ├── main.py  
 └── README.md
 </pre>
